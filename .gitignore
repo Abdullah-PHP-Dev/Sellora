@@ -1,0 +1,62 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Laravel
+/vendor/
+/storage/*.key
+/storage/pail
+/storage/logs/*
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/testing/*
+/storage/framework/views/*
+/bootstrap/cache/*.php
+
+# Laravel generated/public files
+/public/build/
+/public/hot
+/public/storage
+
+# Node
+/node_modules/
+/npm-debug.log*
+/yarn-debug.log*
+/yarn-error.log*
+/pnpm-debug.log*
+/bun-debug.log*
+/bun-error.log*
+
+# Logs
+*.log
+
+# Testing
+.phpunit.result.cache
+/.phpunit.cache
+
+# IDE / Editors
+/.idea
+/.fleet
+/.nova
+/.vscode
+/.zed
+.phpactor.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Composer
+/auth.json
+
+# Local development
+Homestead.json
+Homestead.yaml
+
+# Temporary / local tooling
+/.history
+/.cache
+
+# Vite
+vite.config.ts.timestamp-*
