@@ -17,6 +17,11 @@
     "dependencies": {
         "@inertiajs/vue3": "^3.7.1",
         "@vitejs/plugin-vue": "^6.0.9",
-        "vue": "^3.5.43"
+        "@vueuse/core": "^14.4.0",
+        "apexcharts": "^7.6.0",
+        "flatpickr": "^4.6.13",
+        "simplebar-vue": "^2.4.2",
+        "vue": "^3.5.43",
+        "vue3-apexcharts": "^1.11.1"
     }
 }
