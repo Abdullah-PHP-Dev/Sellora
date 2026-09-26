@@ -15,4 +15,10 @@ export default defineConfig({
         vue(),
         tailwindcss(),
     ],
+    server: {
+        host: '0.0.0.0',
+        port: 5173,
+        allowedHosts: true,
+        origin: process.env.VITE_DEV_SERVER_PUBLIC_URL || undefined,
+    },
 });

@@ -1,0 +1,89 @@
+services:
+  db:
+    image: mysql:8.0
+    command: --log-bin-trust-function-creators=1
+    environment:
+      MYSQL_DATABASE: sellora
+      MYSQL_USER: sellora
+      MYSQL_PASSWORD: secret
+      MYSQL_ROOT_PASSWORD: rootsecret
+    volumes:
+      - dbdata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootsecret"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  setup:
+    build:
+      context: .
+      dockerfile: Dockerfile.base44
+    volumes:
+      - .:/app
+    env_file:
+      - ./.env.base44-defaults
+      - /run/base44/app.env
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "
+        composer install --no-interaction --prefer-dist &&
+        npm install &&
+        cp .env.example .env &&
+        sed -i 's/DB_CONNECTION=sqlite/DB_CONNECTION=mysql/' .env &&
+        sed -i 's/^# DB_HOST=127.0.0.1/DB_HOST=db/' .env &&
+        sed -i 's/^# DB_PORT=3306/DB_PORT=3306/' .env &&
+        sed -i 's/^# DB_DATABASE=laravel/DB_DATABASE=sellora/' .env &&
+        sed -i 's/^# DB_USERNAME=root/DB_USERNAME=sellora/' .env &&
+        sed -i 's/^# DB_PASSWORD=/DB_PASSWORD=secret/' .env &&
+        php artisan key:generate --force &&
+        php artisan migrate --force &&
+        php artisan db:seed --force
+      "
+    restart: "no"
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.base44
+    volumes:
+      - .:/app
+    env_file:
+      - ./.env.base44-defaults
+      - /run/base44/app.env
+    environment:
+      - PHP_CLI_SERVER_WORKERS=4
+    command: php artisan serve --host=0.0.0.0 --port=3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      setup:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  vite:
+    build:
+      context: .
+      dockerfile: Dockerfile.base44
+    volumes:
+      - .:/app
+    env_file:
+      - ./.env.base44-defaults
+      - /run/base44/app.env
+    environment:
+      - VITE_DEV_SERVER_PUBLIC_URL=https://5173-${BASE44_PUBLIC_HOST_SUFFIX}
+    command: npm run dev -- --host 0.0.0.0 --port 5173 --strictPort
+    ports:
+      - "5173:5173"
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  dbdata:
