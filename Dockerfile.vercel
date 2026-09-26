@@ -1,0 +1,87 @@
+# Sellora — Laravel 12 + Inertia Vue on Vercel (FrankenPHP container)
+# PHP 8.2 to match composer.json "php": "^8.2"
+
+FROM dunglas/frankenphp:1-php8.2-bookworm AS base
+
+RUN cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" \
+  && install-php-extensions \
+    intl \
+    zip \
+    bcmath \
+    mbstring \
+    pdo_mysql \
+    pdo_pgsql \
+    pdo_sqlite \
+    gd \
+    redis
+
+WORKDIR /app
+
+# ---------- PHP dependencies (cached layer) ----------
+FROM base AS dependencies
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+COPY composer.json composer.lock ./
+RUN composer install \
+  --no-dev \
+  --no-interaction \
+  --no-progress \
+  --no-scripts \
+  --optimize-autoloader \
+  --prefer-dist
+
+# ---------- Frontend build (Vite + Vue + Tailwind v4) ----------
+FROM dependencies AS frontend
+
+# Node 20 for Vite 7
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+  && apt-get install -y nodejs \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY resources ./resources
+COPY vite.config.js ./
+COPY public ./public
+COPY . .
+
+RUN npm run build
+
+# ---------- Final runtime image ----------
+FROM base AS runtime
+
+COPY --from=dependencies --chown=www-data:www-data /app /app
+COPY --from=frontend --chown=www-data:www-data /app/public/build /app/public/build
+COPY --chown=www-data:www-data . /app
+
+# Re-dump autoload to run Laravel post-autoload scripts (package:discover)
+RUN composer dump-autoload --no-dev --classmap-authoritative \
+  && mkdir -p \
+    storage/framework/cache \
+    storage/framework/sessions \
+    storage/framework/views \
+    bootstrap/cache \
+  && php artisan event:cache || true \
+  && php artisan view:cache || true \
+  && chown -R www-data:www-data storage bootstrap/cache
+
+COPY --chown=www-data:www-data Caddyfile /etc/frankenphp/Caddyfile
+
+RUN setcap CAP_NET_BIND_SERVICE=+eip /usr/local/bin/frankenphp \
+  && chown -R www-data:www-data /config/caddy /data/caddy
+
+# Stateless defaults so the container boots without a DB.
+# Override these in Vercel Dashboard > Settings > Environment Variables
+# with your real production values (especially APP_KEY + DB_*).
+ENV PORT=80 \
+  APP_ENV=production \
+  APP_DEBUG=false \
+  LOG_CHANNEL=stderr \
+  CACHE_STORE=array \
+  SESSION_DRIVER=array \
+  QUEUE_CONNECTION=sync
+
+USER www-data
+
+CMD ["frankenphp", "run", "--config", "/etc/frankenphp/Caddyfile"]
